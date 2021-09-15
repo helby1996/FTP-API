@@ -20,11 +20,11 @@ import io
 import sys
 import pysftp 
 import paramiko
-
+#download necessary files from sftp server
 def from_sftp():
-            sftp= pysftp.Connection('', username='',
+      sftp= pysftp.Connection('', username='',
                         password='')
-            sftp.cwd('/input/')    
+      sftp.cwd('/input/')    
             listoffiles = [
                 attr.filename
                 for attr in sftp.listdir_attr()
@@ -32,20 +32,21 @@ def from_sftp():
                 and 'CstPln' in attr.filename #включить при работе
                            ]
                        #if datetime.datetime.fromtimestamp(attr.st_mtime).date() == datetime.datetime.now().date()]
-            data = pd.read_csv(listoffiles[5], dtype=str, sep=";")
-            data =pd.concat(
+      data = pd.read_csv(listoffiles[5], dtype=str, sep=";")
+      data =pd.concat(
                 list(map(lambda x:pd.read_csv(listoffiles[x],
                  dtype=str, sep=","),
                  range(0,len(listoffiles))))
                 )
-            list(map(lambda x: sftp.rename('/var/sftp/paz/input/',
+      list(map(lambda x: sftp.rename('/var/sftp/paz/input/',
                                            '/var/sftp/paz/input/OK'+x),
                      listoffiles))
-            sftp.rename('/input/'+listoffiles[5], '/input/OK/'+listoffiles)
+      sftp.rename('/input/'+listoffiles[5], '/input/OK/'+listoffiles)
                         '/var/sftp/paz/input/OK/'+listoffiles[0])
-            return data
+     return data
             
 data = from_sftp()
+#data processing
 def data_processing1(data):
     data['dateTime'] = pd.to_datetime(data['date']
                                       + " " + data['time'][:-2]).astype(str)
@@ -53,6 +54,7 @@ def data_processing1(data):
     data['energy'] = np.where(data['energy'].str.contains("-"),
                               data['energy'].str.replace("-",""), "-"+data['energy'])
     return data[['dateTime','deviceId', 'energy']]
+#second variant of files
 def data_processing_cstprd(data):
     data = pd.read_csv('/Users/admin/Downloads/CustomerPrediction20210824120000.csv', 
                        dtype=str, names=['Pl_Type', 'dateTime', 'Hour', 'energy',
@@ -64,14 +66,16 @@ def data_processing_cstprd(data):
     return data
     
 filename=data_processing_cstprd(data)
+#send new file to folder in sftp
 def to_ftp(filename):
-        sftp= pysftp.Connection('', username='',
+    sftp= pysftp.Connection('', username='',
                         password='')
-        sftp.cwd('/output/')
-        name = f"Cst_Pln_{datetime.datetime.now()}.csv"
-        filename.to_csv(name, index=False)
-        sftp.put(name, f"/output/{name}")                
+    sftp.cwd('/output/')
+    name = f"Cst_Pln_{datetime.datetime.now()}.csv"
+    filename.to_csv(name, index=False)
+    sftp.put(name, f"/output/{name}")                
 to_ftp(filename)
+#run forecast job in UI with new data
 def run_job():
     response=requests.post(url='',
                            headers={'Content-Type':'application/json'},
